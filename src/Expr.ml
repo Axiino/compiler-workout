@@ -51,6 +51,7 @@ let _ =
 *)
 
 let toInt ret = if ret then 1 else 0
+let toBool ret = ret != 0
 
 let rec eval state express = match express with
     | Const c -> c
@@ -66,5 +67,5 @@ let rec eval state express = match express with
     | Binop("<=",x, y) -> toInt(eval state x <= eval state y)
     | Binop("==",x, y) -> toInt(eval state x == eval state y)
     | Binop("!=",x, y) -> toInt(eval state x != eval state y)
-    | Binop("!!",x, y) -> toInt(eval state x != 0 || eval state y != 0)
-    | Binop("&&",x, y) -> toInt(eval state x != 0 && eval state y != 0)
+    | Binop("!!",x, y) -> toInt(eval state toBool x || eval state toBool y)
+    | Binop("&&",x, y) -> toInt(eval state toBool x && eval state toBool y)
