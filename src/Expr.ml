@@ -52,20 +52,23 @@ let _ =
 
 let toInt ret = if ret then 1 else 0
 let toBool ret = ret != 0
-
+    
+let operator new_oper left right = match new_oper with
+  | "+"  -> left + right
+  | "-"  -> left - right
+  | "*"  -> left * right
+  | "/"  -> left / right
+  | "%"  -> left mod right
+  | ">"  -> toInt (left > right)
+  | "<"  -> toInt (left < right)
+  | ">=" -> toInt (left >= right)
+  | "<=" -> toInt (left <= right)
+  | "==" -> toInt (left = right)
+  | "!=" -> toInt (left != right)
+  | "!!" -> toInt (toBool left || toBool right)
+  | "&&" -> toInt (toBool left && toBool right)
+  
 let rec eval state express = match express with
-    | Const c -> c
-    | Var v -> state v
-    | Binop("+", x, y) -> eval state x + eval state y
-    | Binop("-", x, y) -> eval state x - eval state y
-    | Binop("*", x, y) -> eval state x * eval state y
-    | Binop("/", x, y) -> eval state x / eval state y
-    | Binop("%", x, y) -> eval state x mod eval state y
-    | Binop(">", x, y) -> toInt(eval state x > eval state y)
-    | Binop("<", x, y) -> toInt(eval state x < eval state y)
-    | Binop(">=",x, y) -> toInt(eval state x >= eval state y)
-    | Binop("<=",x, y) -> toInt(eval state x <= eval state y)
-    | Binop("==",x, y) -> toInt(eval state x == eval state y)
-    | Binop("!=",x, y) -> toInt(eval state x != eval state y)
-    | Binop("!!",x, y) -> toInt(eval state toBool x || eval state toBool y)
-    | Binop("&&",x, y) -> toInt(eval state toBool x && eval state toBool y)
+  | Const c -> c
+  | Var v -> state v
+  | Binop (new_oper, left, right) -> operator new_oper (eval state left) (eval state right) 
