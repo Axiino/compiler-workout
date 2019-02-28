@@ -91,8 +91,6 @@ module Stmt =
        Takes a configuration and a statement, and returns another configuration
     *)
                                                          
-  end
-  
    let rec eval conf statement =
       let (state, input, output) = conf in
       match statement with
