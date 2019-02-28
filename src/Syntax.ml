@@ -41,6 +41,7 @@ module Expr =
        Takes a state and an expression, and returns the value of the expression in 
        the given state.
     *)
+
 let toInt ret = if ret then 1 else 0
 let toBool ret = ret != 0
     
@@ -66,6 +67,9 @@ let rec eval state express = match express with
   | Var v -> state v
   | Binop (new_oper, left, right) -> operator new_oper (eval state left) (eval state right);;
                    
+
+  end
+                    
 (* Simple statements: syntax and sematics *)
 module Stmt =
   struct
@@ -97,7 +101,7 @@ module Stmt =
         | Write expr -> (state, input, output @ [Expr.eval state expr])
         | Assign (var, expr) -> (Expr.update var (Expr.eval state expr) state, input, output)
         | Seq (le, ri) -> eval (eval config le) ri;;  
-                                                         
+                                                       
   end
 
 (* The top-level definitions *)

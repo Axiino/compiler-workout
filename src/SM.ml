@@ -23,6 +23,7 @@ type config = int list * Syntax.Stmt.config
 
    Takes a configuration and a program, and returns a configuration as a result
  *)                         
+
 let eval_conf conf insn =
 	let (stack, state_cfg) = conf in
 	let (state, input, output) = state_cfg in
@@ -60,6 +61,7 @@ let run i p = let (_, (_, _, o)) = eval ([], (Syntax.Expr.empty, i, [])) p in o
    Takes a program in the source language and returns an equivalent program for the
    stack machine
  *)
+
 let rec compile_expr expr = match expr with
        | Syntax.Expr.Const  const         -> [CONST const]
        | Syntax.Expr.Var    var         -> [LD var]
