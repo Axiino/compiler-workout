@@ -42,30 +42,33 @@ module Expr =
        the given state.
     *)
 
-let toInt ret = if ret then 1 else 0
-let toBool ret = ret != 0
-    
-let operator new_oper left right = match new_oper with
-  | "+"  -> left + right
-  | "-"  -> left - right
-  | "*"  -> left * right
-  | "/"  -> left / right
-  | "%"  -> left mod right
-  | ">"  -> toInt (left > right)
-  | "<"  -> toInt (left < right)
-  | ">=" -> toInt (left >= right)
-  | "<=" -> toInt (left <= right)
-  | "==" -> toInt (left = right)
-  | "!=" -> toInt (left != right)
-  | "!!" -> toInt (toBool left || toBool right)
-  | "&&" -> toInt (toBool left && toBool right)
+   let toInt ret = if ret then 1 else 0;;
+   let toBool ret = ret != 0;;
 
-  end
+   let operator new_oper left right = match new_oper with
+     | "+"  -> left + right
+     | "-"  -> left - right
+     | "*"  -> left * right
+     | "/"  -> left / right
+     | "%"  -> left mod right
+     | ">"  -> toInt (left > right)
+     | "<"  -> toInt (left < right)
+     | ">=" -> toInt (left >= right)
+     | "<=" -> toInt (left <= right)
+     | "==" -> toInt (left = right)
+     | "!=" -> toInt (left != right)
+     | "!!" -> toInt (toBool left || toBool right)
+     | "&&" -> toInt (toBool left && toBool right);;
+
+     
+
+   let rec eval state express = match express with
+     | Const c -> c
+     | Var v -> state v
+     | Binop (new_oper, left, right) -> operator new_oper (eval state left) (eval state right);;
+
   
-let rec eval state express = match express with
-  | Const c -> c
-  | Var v -> state v
-  | Binop (new_oper, left, right) -> operator new_oper (eval state left) (eval state right);;
+  end
                    
                     
 (* Simple statements: syntax and sematics *)
