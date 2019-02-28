@@ -99,7 +99,7 @@ module Stmt =
                       | head::tail -> (Expr.update var head state, tail, output))
         | Write expr -> (state, input, output @ [Expr.eval state expr])
         | Assign (var, expr) -> (Expr.update var (Expr.eval state expr) state, input, output)
-        | Seq (le, ri) -> eval (eval config le) ri;;  
+        | Seq (le, ri) -> eval (eval conf le) ri;;  
                                                        
   end
 
