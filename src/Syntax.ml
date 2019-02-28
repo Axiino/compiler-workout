@@ -67,8 +67,6 @@ let rec eval state express = match express with
   | Var v -> state v
   | Binop (new_oper, left, right) -> operator new_oper (eval state left) (eval state right);;
                    
-
-  end
                     
 (* Simple statements: syntax and sematics *)
 module Stmt =
