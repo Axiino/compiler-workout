@@ -39,7 +39,7 @@ let eval_conf conf insn =
 	    | WRITE -> (match stack with
 		    | head::tail -> (tail, (state, input, output @ [head])))
 
-	    | LD  var -> ([state var] @ stack, statem_cfg)
+	    | LD  var -> ([state var] @ stack, state_cfg)
 
 	    | ST  var -> (match stack with
 		    | head::tail -> (tail, (Syntax.Expr.update var head state, input, output)))
