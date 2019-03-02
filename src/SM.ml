@@ -24,8 +24,8 @@ type config = int list * Syntax.Stmt.config
    Takes a configuration and a program, and returns a configuration as a result
  *)                         
 
-let eval_conf conf insn =
-	let (stack, state_cfg) = conf in
+let eval_conf config insn =
+	let (stack, state_cfg) = config in
 	let (state, input, output) = state_cfg in
 	match insn with
 	    | BINOP operator -> (match stack with
@@ -44,7 +44,7 @@ let eval_conf conf insn =
 	    | ST  var -> (match stack with
 		    | head::tail -> (tail, (Syntax.Expr.update var head state, input, output)))
 
-let eval config prg = List.fold_left eval_config config prg
+let eval config prg = List.fold_left eval_conf config prg
 
 (* Top-level evaluation
 
