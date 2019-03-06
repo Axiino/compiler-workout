@@ -135,7 +135,7 @@ module Stmt =
 			| "write" "(" e:!(Expr.expr) ")" {Write e};
 			
 		parse: s:stmt ";" rest:parse {Seq(s, rest)} | stmt
-      
+      )
   end
 
 (* The top-level definitions *)
