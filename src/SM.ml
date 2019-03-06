@@ -28,7 +28,7 @@ type config = int list * Stmt.config
 	let (stack, state_cfg) = config in
 	let (state, input, output) = state_cfg in match insn with
 	    | BINOP operator -> (match stack with
-		    | y::x::tail -> ([(Syntax.Expr.operator operator) x y] @ tail, state_cfg))
+		    | y::x::tail -> ([(Language.Expr.operator operator) x y] @ tail, state_cfg))
 
            | CONST value -> ([value] @ stack, state_cfg)
 
@@ -39,7 +39,7 @@ type config = int list * Stmt.config
 
 	    | LD  var -> ([state var] @ stack, state_cfg)
 	    | ST  var -> (match stack with
-		    | head::tail -> (tail, (Syntax.Expr.update var head state, input, output)))
+		    | head::tail -> (tail, (Language.Expr.update var head state, input, output)))
  
 let eval config prg = List.fold_left eval_config config prg
 
@@ -59,12 +59,12 @@ let run p i = let (_, (_, _, o)) = eval ([], (Language.Expr.empty, i, [])) p in 
    stack machine
  *)
 let rec comp_expression expression = match expression with
-       | Syntax.Expr.Const  const         -> [CONST const]
-       | Syntax.Expr.Var    var         -> [LD var]
-       | Syntax.Expr.Binop (op, left, right) -> (comp_expression left) @ (comp_expression right) @ [BINOP op]
+       | Language.Expr.Const  const         -> [CONST const]
+       | Language.Expr.Var    var         -> [LD var]
+       | Language.Expr.Binop (op, left, right) -> (comp_expression left) @ (comp_expression right) @ [BINOP op]
 
 let rec compile s = match s with
-       | Syntax.Stmt.Read    var       -> [READ; ST var]
-       | Syntax.Stmt.Write   expression       -> (comp_expression expression) @ [WRITE]
-       | Syntax.Stmt.Assign (var, expression)   -> (comp_expression expression) @ [ST var]
-       | Syntax.Stmt.Seq    (left, right) -> (compile left) @ (compile right)
+       | Language.Stmt.Read    var       -> [READ; ST var]
+       | Language.Stmt.Write   expression       -> (comp_expression expression) @ [WRITE]
+       | Language.Stmt.Assign (var, expression)   -> (comp_expression expression) @ [ST var]
+       | Language.Stmt.Seq    (left, right) -> (compile left) @ (compile right)
