@@ -28,7 +28,47 @@ type config = int list * Stmt.config
    Takes an environment, a configuration and a program, and returns a configuration as a result. The
    environment is used to locate a label to jump to (via method env#labeled <label_name>)
 *)                         
-let rec eval env conf prog = failwith "Not yet implemented"
+let rec eval env ((stack, ((st, i, o) as c)) as conf) = function
+  | [] -> conf
+  | inst :: prog_tail ->
+       match inst with
+       | BINOP op ->
+          begin
+            match stack with
+            | y :: x :: tail ->
+               eval env ((Expr.eval_binop op x y) :: tail, c) prog_tail
+            | _ -> failwith "cannot perform BINOP"
+          end
+       | CONST v -> eval env (v :: stack, c) prog_tail
+       | READ ->
+          begin
+            match i with
+            | x :: tail -> eval env (x :: stack, (st, tail, o)) prog_tail
+            | _ -> failwith "cannot perform READ"
+          end
+       | WRITE ->
+          begin
+            match stack with
+            | x :: tail -> eval env (tail, (st, i, o @ [x])) prog_tail
+            | _ -> failwith "cannot perform WRITE"
+          end
+       | LD x -> eval env ((st x) :: stack, c) prog_tail
+       | ST x ->
+          begin
+            match stack with
+            | z :: tail -> eval env (tail, ((Expr.update x z st), i, o)) prog_tail
+            | _ -> failwith "cannot perform ST"
+          end
+       | LABEL l -> eval env conf prog_tail
+       | JMP l -> eval env conf (env#labeled l)
+       | CJMP (b, l) ->
+          begin
+            match stack with
+            | x :: tail -> if (x = 0 && b = "z" || x != 0 && b = "nz")
+                           then eval env (tail, c) (env#labeled l)
+                           else eval env (tail, c) prog_tail
+            | _ -> failwith "stack is empty"
+          end
 
 (* Top-level evaluation
 
@@ -53,4 +93,35 @@ let run p i =
    Takes a program in the source language and returns an equivalent program for the
    stack machine
 *)
-let compile p = failwith "Not yet implemented"
+let label_generator =
+  object
+    val mutable counter = 0
+    method generate =
+      counter <- counter + 1;
+      "l_" ^ string_of_int counter
+  end
+
+let rec compile_expr expr =
+  match expr with
+  | Expr.Var x -> [LD x]
+  | Expr.Const c -> [CONST c]
+  | Expr.Binop (op, e1, e2) -> (compile_expr e1) @ (compile_expr e2) @ [BINOP op]
+
+let rec compile stm =
+  match stm with
+  | Stmt.Assign (x, e) -> (compile_expr e) @ [ST x]
+  | Stmt.Read x -> [READ] @ [ST x]
+  | Stmt.Write e -> (compile_expr e) @ [WRITE]
+  | Stmt.Seq (s1, s2) -> (compile s1) @ (compile s2)
+  | Stmt.Skip -> []
+  | Stmt.If (e, s1, s2) ->
+     let l_else = label_generator#generate in
+     let l_fi = label_generator#generate in
+     (compile_expr e) @ [CJMP ("z", l_else)] @ (compile s1) @ [JMP l_fi] @ [LABEL l_else] @ (compile s2) @ [LABEL l_fi]
+  | Stmt.While (e, s) ->
+     let l_expr = label_generator#generate in
+     let l_od = label_generator#generate in
+     [LABEL l_expr] @ (compile_expr e) @ [CJMP ("z", l_od)] @ (compile s) @ [JMP l_expr] @ [LABEL l_od]
+  | Stmt.RepeatUntil (e, s) ->
+     let l_repeat = label_generator#generate in
+     [LABEL l_repeat] @ (compile s) @ (compile_expr e) @ [CJMP ("z", l_repeat)]
