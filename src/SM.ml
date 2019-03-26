@@ -22,58 +22,40 @@ type prg = insn list
 type config = int list * Stmt.config
 
 (* Stack machine interpreter
-
      val eval : env -> config -> prg -> config
-
    Takes an environment, a configuration and a program, and returns a configuration as a result. The
    environment is used to locate a label to jump to (via method env#labeled <label_name>)
 *)                         
-let rec eval env ((stack, ((st, i, o) as c)) as conf) = function
-  | [] -> conf
-  | inst :: prog_tail ->
-       match inst with
-       | BINOP op ->
-          begin
-            match stack with
-            | y :: x :: tail ->
-               eval env ((Expr.eval_binop op x y) :: tail, c) prog_tail
-            | _ -> failwith "cannot perform BINOP"
-          end
-       | CONST v -> eval env (v :: stack, c) prog_tail
-       | READ ->
-          begin
-            match i with
-            | x :: tail -> eval env (x :: stack, (st, tail, o)) prog_tail
-            | _ -> failwith "cannot perform READ"
-          end
-       | WRITE ->
-          begin
-            match stack with
-            | x :: tail -> eval env (tail, (st, i, o @ [x])) prog_tail
-            | _ -> failwith "cannot perform WRITE"
-          end
-       | LD x -> eval env ((st x) :: stack, c) prog_tail
-       | ST x ->
-          begin
-            match stack with
-            | z :: tail -> eval env (tail, ((Expr.update x z st), i, o)) prog_tail
-            | _ -> failwith "cannot perform ST"
-          end
-       | LABEL l -> eval env conf prog_tail
-       | JMP l -> eval env conf (env#labeled l)
-       | CJMP (b, l) ->
-          begin
-            match stack with
-            | x :: tail -> if (x = 0 && b = "z" || x != 0 && b = "nz")
-                           then eval env (tail, c) (env#labeled l)
-                           else eval env (tail, c) prog_tail
-            | _ -> failwith "stack is empty"
-          end
+let hd_tl = Language.Stmt.hd_tl
+let cjmp_sat znz value = if (znz = "nz" && value <> 0) || (znz = "z" && value == 0) then true else false
+let rec eval env (st, (s, i, o)) p = if 1 == 0 then (st, (s, i, o)) else
+    let eval_expr expr = match expr with
+        | BINOP op -> (match st with
+            | (y::x::xs) -> (Language.Expr.str_to_op op x y :: xs, (s, i, o)) 
+            | _ -> failwith "Stack is empty on binop")
+        | CONST x -> (x :: st, (s, i, o))
+        | READ -> let (head, tail) = hd_tl i "Unexpected end of input" in
+                      (head :: st, (s, tail, o))
+        | WRITE -> let (head, tail) = hd_tl st "Stack is empty on write" in
+                       (tail, (s, i, o @ [head]))
+        | LD name -> (s name :: st, (s, i, o))
+        | ST name -> let (head, tail) = hd_tl st "Stack is empty on store" in
+                     let new_state = Language.Expr.update name head s in
+                     (tail, (new_state, i, o))
+        | LABEL _ -> (st, (s, i, o))
+        | _ -> failwith "impossible"
+    in match p with
+        | x::xs -> (match x with 
+            | JMP label -> eval env (st, (s, i, o)) (env#labeled label)
+            | CJMP (znz, label) -> let (head, tail) = hd_tl st "Stack is empty on cjmp" in
+                if cjmp_sat znz head
+                then eval env (tail, (s, i, o)) (env#labeled label)
+                else eval env (tail, (s, i, o)) xs
+            | _ -> eval env (eval_expr x) xs)
+        | _ -> (st, (s, i, o))
 
 (* Top-level evaluation
-
      val run : prg -> int list -> int list
-
    Takes a program, an input stream, and returns an output stream this program calculates
 *)
 let run p i =
@@ -84,12 +66,13 @@ let run p i =
   | _ :: tl         -> make_map m tl
   in
   let m = make_map M.empty p in
+  if (1 == 0) then
+  List.fold_left (fun () pr ->
+                  Printf.printf "%s\n" (GT.transform(insn) (new @insn[show]) () pr)) () p
+  else ();
   let (_, (_, _, o)) = eval (object method labeled l = M.find l m end) ([], (Expr.empty, i, [])) p in o
-
 (* Stack machine compiler
-
      val compile : Language.Stmt.t -> prg
-
    Takes a program in the source language and returns an equivalent program for the
    stack machine
 *)
