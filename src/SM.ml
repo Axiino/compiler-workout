@@ -93,35 +93,51 @@ let run p i =
    Takes a program in the source language and returns an equivalent program for the
    stack machine
 *)
-let label_generator =
-  object
-    val mutable counter = 0
-    method generate =
-      counter <- counter + 1;
-      "l_" ^ string_of_int counter
+class labels =
+  object (self)
+    val label_n = 0
+    method get_label = {< label_n = label_n + 1 >}, self#generate_label
+    method generate_label = "label" ^ string_of_int label_n
   end
 
-let rec compile_expr expr =
-  match expr with
-  | Expr.Var x -> [LD x]
-  | Expr.Const c -> [CONST c]
-  | Expr.Binop (op, e1, e2) -> (compile_expr e1) @ (compile_expr e2) @ [BINOP op]
+let rec compile_expr e = match e with
+    | Language.Expr.Const x -> [CONST x]
+    | Language.Expr.Var n -> [LD n]
+    | Language.Expr.Binop (op, e1, e2) -> compile_expr e1 @ compile_expr e2 @ [BINOP op]
 
-let rec compile stm =
-  match stm with
-  | Stmt.Assign (x, e) -> (compile_expr e) @ [ST x]
-  | Stmt.Read x -> [READ] @ [ST x]
-  | Stmt.Write e -> (compile_expr e) @ [WRITE]
-  | Stmt.Seq (s1, s2) -> (compile s1) @ (compile s2)
-  | Stmt.Skip -> []
-  | Stmt.If (e, s1, s2) ->
-     let l_else = label_generator#generate in
-     let l_fi = label_generator#generate in
-     (compile_expr e) @ [CJMP ("z", l_else)] @ (compile s1) @ [JMP l_fi] @ [LABEL l_else] @ (compile s2) @ [LABEL l_fi]
-  | Stmt.While (e, s) ->
-     let l_expr = label_generator#generate in
-     let l_od = label_generator#generate in
-     [LABEL l_expr] @ (compile_expr e) @ [CJMP ("z", l_od)] @ (compile s) @ [JMP l_expr] @ [LABEL l_od]
-  | Stmt.RepeatUntil (e, s) ->
-     let l_repeat = label_generator#generate in
-     [LABEL l_repeat] @ (compile s) @ (compile_expr e) @ [CJMP ("z", l_repeat)]
+let rec compile_impl lb p after_label = match p with
+    | Language.Stmt.Read name -> ([READ; ST name]), false, lb
+    | Language.Stmt.Write expr -> (compile_expr expr @ [WRITE]), false, lb
+    | Language.Stmt.Assign (name, expr) -> (compile_expr expr @ [ST name]), false, lb
+    | Language.Stmt.Seq (e1, e2) -> let (lb, label) = lb#get_label in
+                                    let (prg1, used1, lb) = compile_impl lb e1 label in
+                                    let (prg2, used2, lb) = compile_impl lb e2 after_label in
+                                    (prg1 @
+                                    (if used1 then [LABEL label] else []) @
+                                    prg2), used2, lb
+    | Language.Stmt.Skip -> [], false, lb
+    | Language.Stmt.If (cond, thn, els) ->
+        let lb, else_label = lb#get_label in
+        let condition = compile_expr cond in
+        let (thn_body, used1, lb) = compile_impl lb thn after_label in
+        let (els_body, used2, lb) = compile_impl lb els after_label in
+        condition @ [CJMP ("z", else_label)] @
+        thn_body @ (if used1 then [] else [JMP after_label]) @ [LABEL else_label] @
+        els_body @ (if used2 then [] else [JMP after_label])
+        , true, lb
+    | Language.Stmt.While (cond, body) -> 
+        let lb, before_label = lb#get_label in
+        let lb, condition_label = lb#get_label in
+        let do_body, _, lb = compile_impl lb body condition_label in
+        let condition = compile_expr cond in
+        [JMP condition_label; LABEL before_label] @
+        do_body @ [LABEL condition_label] @ condition @ [CJMP ("nz", before_label)]
+        , false, lb
+    | Language.Stmt.RepeatUntil (body, cond) -> 
+        let (prg, _, lb) = compile_impl lb (Language.Stmt.While (
+                                            Language.Stmt.reverse_condition cond, body)) after_label in
+        List.tl (prg), false, lb
+
+let rec compile p = let lb, label = (new labels)#get_label in
+                    let prg, used, _ = compile_impl lb p label in
+                    prg @ (if used then [LABEL label] else [])
