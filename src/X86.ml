@@ -80,13 +80,77 @@ let show instr =
 open SM
 
 (* Symbolic stack machine evaluator
-
      compile : env -> prg -> env * instr list
-
    Take an environment, a stack machine program, and returns a pair --- the updated environment and the list
    of x86 instructions
 *)
-let compile _ = failwith "Not Implemented Yet"
+let rec compile env scode = match scode with
+	| [] -> env, []
+	| instr :: scode' ->
+	  let env, asm =
+	    match instr with
+	    | CONST n ->
+	      let s, env = env#allocate in
+	      env, [Mov(L n, s)]
+	    | READ ->
+	      let s, env = env#allocate in
+	      env, [Call "Lread"; Mov (eax, s)]
+	    | WRITE ->
+	      let s, env = env#pop in
+	      env, [Push s; Call "Lwrite"; Pop eax]
+	    | LD x ->
+	      let s, env = (env#global x)#allocate in
+	      env, [Mov(M (env#loc x), s)]
+	    | ST x ->
+	      let s, env = (env#global x)#pop in
+        env, [Mov(s, M (env#loc x))]
+      | LABEL l  -> env, [Label l]
+      | JMP l    -> env, [Jmp l]
+      | CJMP (znz, l) -> let h, env = env#pop in env, [Binop ("cmp", L 0, h); CJmp (znz, l)]
+	    | BINOP op ->
+	      let rhs, lhs, env = env#pop2 in
+	      let cmp suff = env#push lhs, [Mov(L 0, eax);
+	                                    Binop ("cmp", rhs, lhs);
+	                                    Set(suff, "%al");
+	                                    Mov(eax, lhs)]
+	      in
+	      let logical op = env#push lhs, [Mov(L 0, eax);
+	                                      Mov(L 0, edx);
+	                                      Binop("cmp", L 0, lhs);
+	                                      Set("ne", "%al");
+	                                      Binop("cmp", L 0, rhs);
+	                                      Set("ne", "%dl");
+	                                      Binop(op, eax, edx);
+	                                      Mov(edx, lhs)]
+	      in
+        match op with
+        | "/" ->
+        let s, env = env#allocate in
+        env, [Mov (lhs, eax); 
+              Cltd; 
+              IDiv rhs; 
+              Mov(eax, s)]
+        | "%" ->
+        let s, env = env#allocate in
+        env, [Mov (lhs, eax); 
+              Cltd; 
+              IDiv rhs; 
+              Mov(edx, s)]
+	      | "+" -> env#push lhs, [Binop ("+", rhs, lhs)]
+	      | "-" -> env#push lhs, [Binop ("-", rhs, lhs)]
+        | "*" -> env#push lhs, [Binop ("*", rhs, lhs)]
+        | "&&" -> logical "&&"
+	      | "!!" -> logical "!!"
+	      | "<" ->  cmp "l"
+	      | ">" ->  cmp "g"
+	      | "<=" -> cmp "le"
+	      | ">=" -> cmp "ge"
+	      | "==" -> cmp "e"
+	      | "!=" -> cmp "ne"
+	      | _ -> failwith (Printf.sprintf "Unsupported binary operator %s" op)
+	  in
+	  let env, asm' = compile env scode' in
+	  env, asm @ asm'
 
 (* A set of strings *)           
 module S = Set.Make (String)
@@ -172,4 +236,3 @@ let build stmt name =
   close_out outf;
   let inc = try Sys.getenv "RC_RUNTIME" with _ -> "../runtime" in
   Sys.command (Printf.sprintf "gcc -m32 -o %s %s/runtime.o %s.s" name inc name)
- 
